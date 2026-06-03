@@ -4,6 +4,8 @@ import { TaskPriority } from "@prisma/client";
 
 const priorityValues = [TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH] as const;
 
+const descriptionSchema = z.string().trim().max(5000).nullable();
+
 const dateOnlySchema = z
   .string()
   .trim()
@@ -14,25 +16,43 @@ const dateOnlySchema = z
   }, "Due date must be a valid calendar date")
   .transform((value) => new Date(`${value}T00:00:00.000Z`));
 
+const dueDateSchema = dateOnlySchema.nullable();
+const titleSchema = z.string().trim().min(1).max(200);
+
 export const createTaskBodySchema = z.object({
-  description: z
-    .string()
-    .trim()
-    .max(5000)
-    .nullable()
-    .optional()
-    .transform((value) => value || null),
-  dueDate: dateOnlySchema
-    .nullable()
-    .optional()
-    .transform((value) => value ?? null),
+  description: descriptionSchema.optional().transform((value) => value || null),
+  dueDate: dueDateSchema.optional().transform((value) => value ?? null),
   priority: z.enum(priorityValues).default(TaskPriority.MEDIUM),
-  title: z.string().trim().min(1).max(200),
+  title: titleSchema,
 });
 
 export const listTasksQuerySchema = z.object({
   status: z.enum(["all", "active", "completed"]).default("all"),
 });
 
+export const taskParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const updateTaskBodySchema = z
+  .object({
+    completed: z.boolean().optional(),
+    description: descriptionSchema.optional().transform((value) => {
+      if (value === "") {
+        return null;
+      }
+
+      return value;
+    }),
+    dueDate: dueDateSchema.optional(),
+    priority: z.enum(priorityValues).optional(),
+    title: titleSchema.optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "At least one task field must be provided",
+  });
+
 export type CreateTaskBody = z.infer<typeof createTaskBodySchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+export type TaskParams = z.infer<typeof taskParamsSchema>;
+export type UpdateTaskBody = z.infer<typeof updateTaskBodySchema>;

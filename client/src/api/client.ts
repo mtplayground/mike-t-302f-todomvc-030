@@ -1,5 +1,3 @@
-const defaultBaseUrl = "http://localhost:8080";
-
 export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   readonly body?: unknown;
 }
@@ -38,7 +36,12 @@ export async function apiRequest<TResponse>(
 }
 
 function buildApiUrl(path: string): string {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  if (!baseUrl) {
+    return path;
+  }
+
   return new URL(path, baseUrl).toString();
 }
 

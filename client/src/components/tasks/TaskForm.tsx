@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import type { Task, TaskFormInput, TaskPriority } from "../../api/tasks.js";
 
@@ -38,12 +38,33 @@ export function TaskForm({
   const titleId = useId();
   const descriptionId = useId();
   const dueDateId = useId();
+  const imageId = useId();
   const priorityId = useId();
+  const removeImageId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [values, setValues] = useState<TaskFormValues>(emptyValues);
   const [clientError, setClientError] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedImage || typeof URL.createObjectURL !== "function") {
+      setSelectedImagePreviewUrl(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedImage);
+    setSelectedImagePreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [selectedImage]);
 
   useEffect(() => {
     setClientError(null);
+    setRemoveImage(false);
+    setSelectedImage(null);
+    clearFileInput(fileInputRef.current);
 
     if (!task) {
       setValues(emptyValues);
@@ -72,7 +93,9 @@ export function TaskForm({
       await onSubmit({
         description: values.description.trim() || null,
         dueDate: values.dueDate || null,
+        ...(selectedImage ? { imageFile: selectedImage } : {}),
         priority: values.priority,
+        ...(task && removeImage ? { removeImage: true } : {}),
         title,
       });
     } catch {
@@ -81,8 +104,32 @@ export function TaskForm({
 
     if (!task) {
       setValues(emptyValues);
+      setSelectedImage(null);
+      clearFileInput(fileInputRef.current);
     }
   }
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const image = event.target.files?.[0] ?? null;
+
+    setSelectedImage(image);
+
+    if (image) {
+      setRemoveImage(false);
+    }
+  }
+
+  function handleRemoveImageChange(checked: boolean) {
+    setRemoveImage(checked);
+
+    if (checked) {
+      setSelectedImage(null);
+      clearFileInput(fileInputRef.current);
+    }
+  }
+
+  const previewImageUrl =
+    selectedImagePreviewUrl ?? (!removeImage && task?.imageUrl ? task.imageUrl : null);
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
@@ -158,6 +205,42 @@ export function TaskForm({
         </div>
       </div>
 
+      <div>
+        <label className="block text-sm font-medium text-zinc-700" htmlFor={imageId}>
+          Image
+        </label>
+        <input
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="mt-1 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
+          id={imageId}
+          onChange={handleImageChange}
+          ref={fileInputRef}
+          type="file"
+        />
+        {previewImageUrl ? (
+          <img
+            alt={selectedImage ? "Selected task image preview" : "Current task image"}
+            className="mt-3 h-32 w-full rounded-md border border-zinc-200 object-cover"
+            src={previewImageUrl}
+          />
+        ) : null}
+        {task?.imageUrl ? (
+          <label
+            className="mt-3 flex items-center gap-2 text-sm font-medium text-zinc-700"
+            htmlFor={removeImageId}
+          >
+            <input
+              checked={removeImage}
+              className="h-4 w-4 rounded border-zinc-300 text-emerald-600 accent-emerald-600"
+              id={removeImageId}
+              onChange={(event) => handleRemoveImageChange(event.target.checked)}
+              type="checkbox"
+            />
+            Remove current image
+          </label>
+        ) : null}
+      </div>
+
       {clientError || error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {clientError ?? error}
@@ -173,4 +256,10 @@ export function TaskForm({
       </button>
     </form>
   );
+}
+
+function clearFileInput(input: HTMLInputElement | null): void {
+  if (input) {
+    input.value = "";
+  }
 }

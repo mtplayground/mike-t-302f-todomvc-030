@@ -20,13 +20,20 @@ export interface Task {
 export interface TaskFormInput {
   readonly description: string | null;
   readonly dueDate: string | null;
+  readonly imageFile?: File;
   readonly priority: TaskPriority;
+  readonly removeImage?: boolean;
   readonly title: string;
 }
 
-export interface TaskUpdateInput extends Partial<TaskFormInput> {
+export interface TaskUpdateInput {
   readonly completed?: boolean;
+  readonly description?: string | null;
+  readonly dueDate?: string | null;
+  readonly imageFile?: File;
+  readonly priority?: TaskPriority;
   readonly removeImage?: boolean;
+  readonly title?: string;
 }
 
 interface ListTasksResponse {
@@ -39,7 +46,7 @@ interface TaskResponse {
 
 export async function createTask(input: TaskFormInput): Promise<Task> {
   const response = await apiRequest<TaskResponse>("/tasks", {
-    body: input,
+    body: toTaskRequestBody(input),
     method: "POST",
   });
 
@@ -60,7 +67,7 @@ export async function getTasks(
 
 export async function updateTask(id: string, input: TaskUpdateInput): Promise<Task> {
   const response = await apiRequest<TaskResponse>(`/tasks/${id}`, {
-    body: input,
+    body: toTaskRequestBody(input),
     method: "PATCH",
   });
 
@@ -71,4 +78,36 @@ export async function deleteTask(id: string): Promise<void> {
   await apiRequest<void>(`/tasks/${id}`, {
     method: "DELETE",
   });
+}
+
+function toTaskRequestBody(input: TaskFormInput | TaskUpdateInput): FormData | object {
+  if (!input.imageFile) {
+    return toJsonTaskPayload(input);
+  }
+
+  const formData = new FormData();
+
+  appendFormField(formData, "title", input.title);
+  appendFormField(formData, "description", input.description);
+  appendFormField(formData, "dueDate", input.dueDate);
+  appendFormField(formData, "priority", input.priority);
+  appendFormField(formData, "completed", "completed" in input ? input.completed : undefined);
+  appendFormField(formData, "removeImage", input.removeImage);
+  formData.append("image", input.imageFile);
+
+  return formData;
+}
+
+function toJsonTaskPayload(input: TaskFormInput | TaskUpdateInput): object {
+  const { imageFile: _imageFile, ...payload } = input;
+
+  return payload;
+}
+
+function appendFormField(formData: FormData, key: string, value: unknown): void {
+  if (value === undefined) {
+    return;
+  }
+
+  formData.append(key, value === null ? "" : String(value));
 }

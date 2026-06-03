@@ -26,6 +26,7 @@ export default defineConfig({
           env: {
             ...process.env,
             HOST: "0.0.0.0",
+            NODE_ENV: "test",
             PORT: "8080",
           },
           reuseExistingServer: !process.env.CI,

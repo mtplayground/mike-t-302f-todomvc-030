@@ -1,18 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { ApiError } from "./api/client.js";
 import { getHealth } from "./api/health.js";
+import { getTasks, type TaskStatusFilter } from "./api/tasks.js";
+import { StatusFilterTabs } from "./components/tasks/StatusFilterTabs.js";
+import { TaskList } from "./components/tasks/TaskList.js";
 
 export function App() {
+  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("all");
   const healthQuery = useQuery({
     queryKey: ["health"],
     queryFn: ({ signal }) => getHealth({ signal }),
     retry: 1,
     staleTime: 30_000,
   });
+  const tasksQuery = useQuery({
+    queryKey: ["tasks", statusFilter],
+    queryFn: ({ signal }) => getTasks(statusFilter, { signal }),
+    staleTime: 10_000,
+  });
 
   const apiStatus =
     healthQuery.data?.status === "ok" ? "Online" : healthQuery.isError ? "Offline" : "Checking";
+  const tasks = tasksQuery.data ?? [];
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-950">
@@ -27,13 +38,15 @@ export function App() {
 
         <section className="grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="rounded-lg border border-zinc-200 bg-white">
-            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+            <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
               <h2 className="text-base font-semibold">Tasks</h2>
-              <span className="text-sm text-zinc-500">All</span>
+              <StatusFilterTabs onChange={setStatusFilter} value={statusFilter} />
             </div>
-            <div className="flex min-h-72 items-center justify-center px-4 py-12 text-center text-sm text-zinc-500">
-              No tasks yet.
-            </div>
+            <TaskList
+              error={tasksQuery.error ? formatApiError(tasksQuery.error) : null}
+              isLoading={tasksQuery.isLoading}
+              tasks={tasks}
+            />
           </div>
 
           <aside className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -42,6 +55,10 @@ export function App() {
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-zinc-500">API</dt>
                 <dd className="font-medium text-zinc-800">{apiStatus}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-zinc-500">Shown</dt>
+                <dd className="font-medium text-zinc-800">{tasks.length}</dd>
               </div>
               {healthQuery.error ? (
                 <div className="border-t border-zinc-100 pt-3 text-xs leading-5 text-red-700">

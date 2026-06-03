@@ -3,12 +3,18 @@ import type { Task, TaskPriority } from "../../api/tasks.js";
 export function TaskList({
   error,
   isLoading,
+  onDelete,
   onEdit,
+  onToggleComplete,
+  pendingTaskIds,
   tasks,
 }: {
   readonly error: string | null;
   readonly isLoading: boolean;
+  readonly onDelete: (task: Task) => void;
   readonly onEdit: (task: Task) => void;
+  readonly onToggleComplete: (task: Task, completed: boolean) => void;
+  readonly pendingTaskIds: ReadonlySet<string>;
   readonly tasks: readonly Task[];
 }) {
   if (isLoading) {
@@ -50,11 +56,13 @@ export function TaskList({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    task.completed ? "bg-emerald-500" : "bg-zinc-300"
-                  }`}
+                <input
+                  aria-label={`${task.completed ? "Mark active" : "Mark completed"}: ${task.title}`}
+                  checked={task.completed}
+                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 accent-emerald-600 disabled:cursor-not-allowed"
+                  disabled={pendingTaskIds.has(task.id)}
+                  onChange={(event) => onToggleComplete(task, event.target.checked)}
+                  type="checkbox"
                 />
                 <h3
                   className={`truncate text-sm font-semibold ${
@@ -87,10 +95,19 @@ export function TaskList({
               </span>
               <button
                 className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
+                disabled={pendingTaskIds.has(task.id)}
                 onClick={() => onEdit(task)}
                 type="button"
               >
                 Edit
+              </button>
+              <button
+                className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-400"
+                disabled={pendingTaskIds.has(task.id)}
+                onClick={() => onDelete(task)}
+                type="button"
+              >
+                Delete
               </button>
             </div>
           </div>

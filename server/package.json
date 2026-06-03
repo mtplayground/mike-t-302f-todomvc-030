@@ -13,7 +13,7 @@
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "start": "node dist/server.js",
     "typecheck": "npm run prisma:generate && tsc -p tsconfig.json --noEmit",
-    "test": "echo \"No server tests configured yet\""
+    "test": "npm run prisma:generate && vitest run"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -22,7 +22,10 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/supertest": "^7.2.0",
     "prisma": "^6.19.3",
-    "tsx": "^4.22.4"
+    "supertest": "^7.2.2",
+    "tsx": "^4.22.4",
+    "vitest": "^4.1.8"
   }
 }

@@ -45,6 +45,13 @@ const imageExtensions: Record<AllowedImageContentType, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
+const testImageObjects = new Map<
+  string,
+  {
+    readonly buffer: Buffer;
+    readonly contentType: AllowedImageContentType;
+  }
+>();
 
 const defaultS3Client = new S3Client({
   credentials: {
@@ -88,6 +95,21 @@ export async function uploadTaskImage(
 ): Promise<UploadedImageMetadata> {
   const contentType = validateImageUpload(input);
   const imageKey = generateTaskImageKey(contentType);
+
+  if (usesLocalTestStorage(client)) {
+    testImageObjects.set(imageKey, {
+      buffer: Buffer.from(input.buffer),
+      contentType,
+    });
+
+    return {
+      imageContentType: contentType,
+      imageKey,
+      imageSize: input.size,
+      imageUrl: buildPublicImageUrl(imageKey),
+    };
+  }
+
   const commandInput: PutObjectCommandInput = {
     Body: input.buffer,
     Bucket: env.S3_BUCKET,
@@ -128,6 +150,11 @@ export async function deleteTaskImage(
     return;
   }
 
+  if (usesLocalTestStorage(client)) {
+    testImageObjects.delete(trimmedKey);
+    return;
+  }
+
   const commandInput: DeleteObjectCommandInput = {
     Bucket: env.S3_BUCKET,
     Key: trimmedKey,
@@ -160,6 +187,14 @@ export async function createSignedTaskImageUrl(
     });
   }
 
+  if (env.NODE_ENV === "test" && !options.client) {
+    const imageObject = testImageObjects.get(trimmedKey);
+
+    if (imageObject) {
+      return `data:${imageObject.contentType};base64,${imageObject.buffer.toString("base64")}`;
+    }
+  }
+
   return getSignedUrl(
     options.client ?? defaultS3Client,
     new GetObjectCommand({
@@ -187,4 +222,8 @@ export function generateTaskImageKey(contentType: AllowedImageContentType): stri
 
 function isAllowedImageContentType(contentType: string): contentType is AllowedImageContentType {
   return allowedImageContentTypes.includes(contentType as AllowedImageContentType);
+}
+
+function usesLocalTestStorage(client: S3CommandSender): boolean {
+  return env.NODE_ENV === "test" && client === defaultS3Client;
 }

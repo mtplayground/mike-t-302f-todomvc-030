@@ -9,6 +9,9 @@ export interface Task {
   readonly description: string | null;
   readonly dueDate: string | null;
   readonly id: string;
+  readonly imageContentType: string | null;
+  readonly imageSize: number | null;
+  readonly imageUrl: string | null;
   readonly priority: TaskPriority;
   readonly title: string;
   readonly updatedAt: string;
@@ -23,6 +26,7 @@ export interface TaskFormInput {
 
 export interface TaskUpdateInput extends Partial<TaskFormInput> {
   readonly completed?: boolean;
+  readonly removeImage?: boolean;
 }
 
 interface ListTasksResponse {

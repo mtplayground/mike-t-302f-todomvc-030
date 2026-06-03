@@ -1,13 +1,19 @@
-import type { Task, TaskPriority } from "@prisma/client";
+import type { Prisma, Task, TaskPriority } from "@prisma/client";
 
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../errors/app-error.js";
+import {
+  createSignedTaskImageUrl,
+  deleteTaskImage,
+  type UploadedImageMetadata,
+} from "./storage.js";
 
 export type TaskStatusFilter = "active" | "all" | "completed";
 
 export interface CreateTaskInput {
   readonly description: string | null;
   readonly dueDate: Date | null;
+  readonly image?: UploadedImageMetadata | null;
   readonly priority: TaskPriority;
   readonly title: string;
 }
@@ -16,7 +22,9 @@ export interface UpdateTaskInput {
   readonly completed?: boolean;
   readonly description?: string | null;
   readonly dueDate?: Date | null;
+  readonly image?: UploadedImageMetadata;
   readonly priority?: TaskPriority;
+  readonly removeImage?: boolean;
   readonly title?: string;
 }
 
@@ -26,6 +34,9 @@ export interface TaskDto {
   readonly description: string | null;
   readonly dueDate: string | null;
   readonly id: string;
+  readonly imageContentType: string | null;
+  readonly imageSize: number | null;
+  readonly imageUrl: string | null;
   readonly priority: TaskPriority;
   readonly title: string;
   readonly updatedAt: string;
@@ -36,6 +47,10 @@ export async function createTask(input: CreateTaskInput): Promise<TaskDto> {
     data: {
       description: input.description,
       dueDate: input.dueDate,
+      imageContentType: input.image?.imageContentType ?? null,
+      imageKey: input.image?.imageKey ?? null,
+      imageSize: input.image?.imageSize ?? null,
+      imageUrl: input.image?.imageUrl ?? null,
       priority: input.priority,
       title: input.title,
     },
@@ -50,29 +65,71 @@ export async function listTasks(status: TaskStatusFilter): Promise<TaskDto[]> {
     orderBy: [{ completed: "asc" }, { createdAt: "desc" }],
   });
 
-  return tasks.map(toTaskDto);
+  return Promise.all(tasks.map(toTaskDto));
 }
 
 export async function updateTask(id: string, input: UpdateTaskInput): Promise<TaskDto> {
-  await ensureTaskExists(id);
+  const existingTask = await getTaskOrThrow(id);
+  const data: Prisma.TaskUpdateInput = {};
+
+  if (input.completed !== undefined) {
+    data.completed = input.completed;
+  }
+
+  if (input.description !== undefined) {
+    data.description = input.description;
+  }
+
+  if (input.dueDate !== undefined) {
+    data.dueDate = input.dueDate;
+  }
+
+  if (input.priority !== undefined) {
+    data.priority = input.priority;
+  }
+
+  if (input.title !== undefined) {
+    data.title = input.title;
+  }
+
+  if (input.image) {
+    data.imageContentType = input.image.imageContentType;
+    data.imageKey = input.image.imageKey;
+    data.imageSize = input.image.imageSize;
+    data.imageUrl = input.image.imageUrl;
+  } else if (input.removeImage) {
+    data.imageContentType = null;
+    data.imageKey = null;
+    data.imageSize = null;
+    data.imageUrl = null;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return toTaskDto(existingTask);
+  }
 
   const task = await prisma.task.update({
     where: { id },
-    data: input,
+    data,
   });
+
+  if ((input.image || input.removeImage) && existingTask.imageKey) {
+    await deleteTaskImage(existingTask.imageKey);
+  }
 
   return toTaskDto(task);
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await ensureTaskExists(id);
+  const task = await getTaskOrThrow(id);
+
+  await deleteTaskImage(task.imageKey);
   await prisma.task.delete({ where: { id } });
 }
 
-async function ensureTaskExists(id: string): Promise<void> {
+async function getTaskOrThrow(id: string): Promise<Task> {
   const task = await prisma.task.findUnique({
     where: { id },
-    select: { id: true },
   });
 
   if (!task) {
@@ -81,6 +138,8 @@ async function ensureTaskExists(id: string): Promise<void> {
       statusCode: 404,
     });
   }
+
+  return task;
 }
 
 function toStatusWhere(status: TaskStatusFilter) {
@@ -95,13 +154,16 @@ function toStatusWhere(status: TaskStatusFilter) {
   return {};
 }
 
-function toTaskDto(task: Task): TaskDto {
+async function toTaskDto(task: Task): Promise<TaskDto> {
   return {
     completed: task.completed,
     createdAt: task.createdAt.toISOString(),
     description: task.description,
     dueDate: task.dueDate ? formatDateOnly(task.dueDate) : null,
     id: task.id,
+    imageContentType: task.imageContentType,
+    imageSize: task.imageSize,
+    imageUrl: task.imageKey ? await createSignedTaskImageUrl(task.imageKey) : null,
     priority: task.priority,
     title: task.title,
     updatedAt: task.updatedAt.toISOString(),

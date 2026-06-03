@@ -11,9 +11,9 @@ const activeTask: Task = {
   description: "Cover component behavior",
   dueDate: "2026-06-15",
   id: "11111111-1111-4111-8111-111111111111",
-  imageContentType: null,
-  imageSize: null,
-  imageUrl: null,
+  imageContentType: "image/png",
+  imageSize: 2048,
+  imageUrl: "https://images.test/write-component-tests.png",
   priority: "HIGH",
   title: "Write component tests",
   updatedAt: "2026-06-01T00:00:00.000Z",
@@ -38,6 +38,9 @@ describe("TaskList", () => {
     renderTaskList({ tasks: [activeTask, completedTask] });
 
     expect(screen.getByText("Write component tests")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Write component tests image preview" })
+    ).toHaveAttribute("src", "https://images.test/write-component-tests.png");
     expect(screen.getByText("Cover component behavior")).toBeInTheDocument();
     expect(screen.getByText("Jun 15, 2026")).toBeInTheDocument();
     expect(screen.getByText("High")).toBeInTheDocument();

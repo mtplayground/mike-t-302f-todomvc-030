@@ -14,8 +14,28 @@ export interface Task {
   readonly updatedAt: string;
 }
 
+export interface TaskFormInput {
+  readonly description: string | null;
+  readonly dueDate: string | null;
+  readonly priority: TaskPriority;
+  readonly title: string;
+}
+
 interface ListTasksResponse {
   readonly tasks: Task[];
+}
+
+interface TaskResponse {
+  readonly task: Task;
+}
+
+export async function createTask(input: TaskFormInput): Promise<Task> {
+  const response = await apiRequest<TaskResponse>("/tasks", {
+    body: input,
+    method: "POST",
+  });
+
+  return response.task;
 }
 
 export async function getTasks(
@@ -28,4 +48,13 @@ export async function getTasks(
   });
 
   return response.tasks;
+}
+
+export async function updateTask(id: string, input: TaskFormInput): Promise<Task> {
+  const response = await apiRequest<TaskResponse>(`/tasks/${id}`, {
+    body: input,
+    method: "PATCH",
+  });
+
+  return response.task;
 }

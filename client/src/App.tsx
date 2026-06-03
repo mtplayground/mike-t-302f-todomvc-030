@@ -1,13 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ApiError } from "./api/client.js";
 import { getHealth } from "./api/health.js";
-import { getTasks, type TaskStatusFilter } from "./api/tasks.js";
+import {
+  createTask,
+  getTasks,
+  updateTask,
+  type Task,
+  type TaskFormInput,
+  type TaskStatusFilter,
+} from "./api/tasks.js";
 import { StatusFilterTabs } from "./components/tasks/StatusFilterTabs.js";
+import { TaskForm } from "./components/tasks/TaskForm.js";
 import { TaskList } from "./components/tasks/TaskList.js";
 
 export function App() {
+  const queryClient = useQueryClient();
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("all");
   const healthQuery = useQuery({
     queryKey: ["health"],
@@ -20,10 +30,38 @@ export function App() {
     queryFn: ({ signal }) => getTasks(statusFilter, { signal }),
     staleTime: 10_000,
   });
+  const createMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: async () => {
+      setStatusFilter("all");
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { readonly id: string; readonly input: TaskFormInput }) =>
+      updateTask(id, input),
+    onSuccess: async () => {
+      setEditingTask(null);
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
 
   const apiStatus =
     healthQuery.data?.status === "ok" ? "Online" : healthQuery.isError ? "Offline" : "Checking";
   const tasks = tasksQuery.data ?? [];
+  const formError =
+    createMutation.error || updateMutation.error
+      ? formatApiError((createMutation.error ?? updateMutation.error) as Error)
+      : null;
+
+  async function handleTaskFormSubmit(input: TaskFormInput): Promise<void> {
+    if (editingTask) {
+      await updateMutation.mutateAsync({ id: editingTask.id, input });
+      return;
+    }
+
+    await createMutation.mutateAsync(input);
+  }
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-950">
@@ -45,27 +83,40 @@ export function App() {
             <TaskList
               error={tasksQuery.error ? formatApiError(tasksQuery.error) : null}
               isLoading={tasksQuery.isLoading}
+              onEdit={setEditingTask}
               tasks={tasks}
             />
           </div>
 
-          <aside className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h2 className="text-base font-semibold">System</h2>
-            <dl className="mt-4 space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-zinc-500">API</dt>
-                <dd className="font-medium text-zinc-800">{apiStatus}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-zinc-500">Shown</dt>
-                <dd className="font-medium text-zinc-800">{tasks.length}</dd>
-              </div>
-              {healthQuery.error ? (
-                <div className="border-t border-zinc-100 pt-3 text-xs leading-5 text-red-700">
-                  {formatApiError(healthQuery.error)}
+          <aside className="space-y-4">
+            <div className="rounded-lg border border-zinc-200 bg-white p-4">
+              <TaskForm
+                error={formError}
+                isSubmitting={createMutation.isPending || updateMutation.isPending}
+                onCancelEdit={() => setEditingTask(null)}
+                onSubmit={handleTaskFormSubmit}
+                task={editingTask}
+              />
+            </div>
+
+            <div className="rounded-lg border border-zinc-200 bg-white p-4">
+              <h2 className="text-base font-semibold">System</h2>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-zinc-500">API</dt>
+                  <dd className="font-medium text-zinc-800">{apiStatus}</dd>
                 </div>
-              ) : null}
-            </dl>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-zinc-500">Shown</dt>
+                  <dd className="font-medium text-zinc-800">{tasks.length}</dd>
+                </div>
+                {healthQuery.error ? (
+                  <div className="border-t border-zinc-100 pt-3 text-xs leading-5 text-red-700">
+                    {formatApiError(healthQuery.error)}
+                  </div>
+                ) : null}
+              </dl>
+            </div>
           </aside>
         </section>
       </div>

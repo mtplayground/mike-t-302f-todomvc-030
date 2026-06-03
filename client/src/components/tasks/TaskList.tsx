@@ -3,10 +3,12 @@ import type { Task, TaskPriority } from "../../api/tasks.js";
 export function TaskList({
   error,
   isLoading,
+  onEdit,
   tasks,
 }: {
   readonly error: string | null;
   readonly isLoading: boolean;
+  readonly onEdit: (task: Task) => void;
   readonly tasks: readonly Task[];
 }) {
   if (isLoading) {
@@ -83,6 +85,13 @@ export function TaskList({
               <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600">
                 {task.completed ? "Completed" : "Active"}
               </span>
+              <button
+                className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
+                onClick={() => onEdit(task)}
+                type="button"
+              >
+                Edit
+              </button>
             </div>
           </div>
         </li>

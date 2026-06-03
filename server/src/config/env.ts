@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  DATABASE_URL: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      (value) => value.startsWith("postgresql://") || value.startsWith("postgres://"),
+      "DATABASE_URL must use a PostgreSQL connection string"
+    ),
   HOST: z.string().trim().min(1).default("0.0.0.0"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),

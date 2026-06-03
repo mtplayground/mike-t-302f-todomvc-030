@@ -2,6 +2,7 @@ target/
 node_modules/
 dist/
 coverage/
+server/src/generated/
 .gh_token
 .claude/
 .database_url

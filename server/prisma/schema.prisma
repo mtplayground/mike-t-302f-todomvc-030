@@ -8,3 +8,24 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String       @db.VarChar(200)
+  description String?      @db.Text
+  dueDate     DateTime?    @map("due_date") @db.Date
+  priority    TaskPriority @default(MEDIUM)
+  completed   Boolean      @default(false)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([completed])
+  @@index([dueDate])
+  @@map("tasks")
+}

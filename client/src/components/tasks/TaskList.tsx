@@ -54,29 +54,39 @@ export function TaskList({
       {tasks.map((task) => (
         <li className="px-4 py-4" key={task.id}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <input
-                  aria-label={`${task.completed ? "Mark active" : "Mark completed"}: ${task.title}`}
-                  checked={task.completed}
-                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 accent-emerald-600 disabled:cursor-not-allowed"
-                  disabled={pendingTaskIds.has(task.id)}
-                  onChange={(event) => onToggleComplete(task, event.target.checked)}
-                  type="checkbox"
+            <div className="flex min-w-0 gap-3">
+              {task.imageUrl ? (
+                <img
+                  alt={`${task.title} image preview`}
+                  className="h-16 w-16 shrink-0 rounded-md border border-zinc-200 object-cover"
+                  loading="lazy"
+                  src={task.imageUrl}
                 />
-                <h3
-                  className={`truncate text-sm font-semibold ${
-                    task.completed ? "text-zinc-500 line-through" : "text-zinc-950"
-                  }`}
-                >
-                  {task.title}
-                </h3>
-              </div>
-              {task.description ? (
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-600">
-                  {task.description}
-                </p>
               ) : null}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <input
+                    aria-label={`${task.completed ? "Mark active" : "Mark completed"}: ${task.title}`}
+                    checked={task.completed}
+                    className="h-4 w-4 rounded border-zinc-300 text-emerald-600 accent-emerald-600 disabled:cursor-not-allowed"
+                    disabled={pendingTaskIds.has(task.id)}
+                    onChange={(event) => onToggleComplete(task, event.target.checked)}
+                    type="checkbox"
+                  />
+                  <h3
+                    className={`truncate text-sm font-semibold ${
+                      task.completed ? "text-zinc-500 line-through" : "text-zinc-950"
+                    }`}
+                  >
+                    {task.title}
+                  </h3>
+                </div>
+                {task.description ? (
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-600">
+                    {task.description}
+                  </p>
+                ) : null}
+              </div>
             </div>
 
             <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">

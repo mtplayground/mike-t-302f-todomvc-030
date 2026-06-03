@@ -19,7 +19,7 @@ export function validateRequest(schemas: RequestSchemas): RequestHandler {
       }
 
       if (schemas.query) {
-        request.query = schemas.query.parse(request.query) as typeof request.query;
+        schemas.query.parse(request.query);
       }
 
       next();

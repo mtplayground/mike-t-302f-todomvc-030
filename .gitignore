@@ -1,8 +1,15 @@
 target/
 node_modules/
+dist/
+coverage/
 .gh_token
 .claude/
 .database_url
+.env
+.env.local
+.env.production
+.db_decision
+.storage_decision
 .task_id
 .container_name
 .app_name

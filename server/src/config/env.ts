@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  CLIENT_DIST_PATH: z.string().trim().optional(),
   DATABASE_URL: z
     .string()
     .trim()

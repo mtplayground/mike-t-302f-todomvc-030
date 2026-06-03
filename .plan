@@ -1,0 +1,41 @@
+Architecture plan for todomvc-030
+
+Module structure and file organization
+- Use a TypeScript monorepo with two apps: `server/` for the Express API and `client/` for the React SPA.
+- Root tooling should own shared project concerns: package manager workspace config, ESLint, Prettier, base TypeScript config, scripts for lint/test/build/dev, and `.env.example`.
+- `server/` should contain:
+  - `src/app.ts` for Express app construction and middleware wiring.
+  - `src/server.ts` for process startup.
+  - `src/routes/` for route modules, starting with health and tasks.
+  - `src/services/` for task business logic and Prisma access.
+  - `src/validation/` or route-local Zod schemas for request validation.
+  - `src/middleware/error.ts` for centralized error handling and normalized API errors.
+  - `src/db/prisma.ts` for a singleton Prisma client.
+  - `prisma/schema.prisma` and migrations under `server/prisma/migrations/`.
+- `client/` should contain:
+  - `src/main.tsx`, `src/App.tsx`, and a compact layout shell.
+  - `src/api/` for the typed fetch client and task API functions.
+  - `src/types/` for shared client-side task types that mirror API DTOs.
+  - `src/components/tasks/` for list, filter tabs, form, item row, and task actions.
+  - `src/test/` for React Testing Library setup.
+- Shared types can start as duplicated TypeScript DTOs in `client/src/types` and Zod schemas in `server/src`; extract a root `packages/shared/` package only if later issues show meaningful duplication.
+
+Dependencies between issues
+- Issue #1 is the foundation for all later work: workspace layout, TypeScript, linting, and formatting.
+- Issues #2 and #4 can both follow #1: backend skeleton and frontend skeleton are independent.
+- Issue #3 depends on the Express/server project from #2 and prepares Prisma/PostgreSQL.
+- Issue #5 depends on #3 and creates the task schema/migration.
+- Issues #6 and #7 depend on the task model from #5 and expose CRUD API behavior.
+- Issues #8, #9, and #10 depend on the React shell from #4 and the relevant backend endpoints from #6/#7.
+- Issue #11 depends on the backend API and validation behavior from #6/#7.
+- Issue #12 depends on the implemented frontend workflows from #8/#9/#10.
+- Issue #13 depends on a functional full stack and completes E2E coverage, deployment scripts, and final environment documentation.
+
+Key design decisions
+- Keep the API RESTful and narrow: `GET /health`, `GET /tasks?status=all|active|completed`, `POST /tasks`, `PATCH /tasks/:id`, and `DELETE /tasks/:id`.
+- Validate all request bodies, params, and filters with Zod at the API boundary; return consistent JSON error responses.
+- Model task fields as title, nullable description, nullable due date, priority enum, completed boolean, `createdAt`, and `updatedAt`.
+- Use Prisma as the only database access layer and keep task persistence behind a small service module so endpoint tests can target behavior cleanly.
+- Use React Query for server state, optimistic updates for complete/delete interactions, and a typed API client as the frontend's only HTTP boundary.
+- Keep filtering server-backed so list behavior matches API tests and can scale beyond in-memory UI state.
+- Prefer focused tests per layer: backend service/route tests, frontend component tests with mocked API behavior, and one happy-path E2E flow for create, complete, filter, and delete.

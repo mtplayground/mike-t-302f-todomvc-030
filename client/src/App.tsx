@@ -5,6 +5,7 @@ import { ApiError } from "./api/client.js";
 import { getHealth } from "./api/health.js";
 import {
   createTask,
+  deleteTask,
   getTasks,
   updateTask,
   type Task,
@@ -42,6 +43,69 @@ export function App() {
       updateTask(id, input),
     onSuccess: async () => {
       setEditingTask(null);
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+  const toggleCompleteMutation = useMutation({
+    mutationFn: ({ completed, task }: { readonly completed: boolean; readonly task: Task }) =>
+      updateTask(task.id, { completed }),
+    onMutate: async ({ completed, task }) => {
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      const snapshots = queryClient.getQueriesData<Task[]>({ queryKey: ["tasks"] });
+      const updatedTask = {
+        ...task,
+        completed,
+        updatedAt: new Date().toISOString(),
+      };
+
+      for (const [queryKey, currentTasks] of snapshots) {
+        queryClient.setQueryData(
+          queryKey,
+          applyTaskToCache(currentTasks, updatedTask, getStatusFromQueryKey(queryKey))
+        );
+      }
+
+      return { snapshots };
+    },
+    onError: (_error, _variables, context) => {
+      for (const [queryKey, tasksSnapshot] of context?.snapshots ?? []) {
+        queryClient.setQueryData(queryKey, tasksSnapshot);
+      }
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (task: Task) => deleteTask(task.id),
+    onMutate: async (task) => {
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      const snapshots = queryClient.getQueriesData<Task[]>({ queryKey: ["tasks"] });
+      const previousEditingTask = editingTask;
+
+      for (const [queryKey, currentTasks] of snapshots) {
+        queryClient.setQueryData(
+          queryKey,
+          currentTasks?.filter((currentTask) => currentTask.id !== task.id)
+        );
+      }
+
+      if (editingTask?.id === task.id) {
+        setEditingTask(null);
+      }
+
+      return { previousEditingTask, snapshots };
+    },
+    onError: (_error, _variables, context) => {
+      for (const [queryKey, tasksSnapshot] of context?.snapshots ?? []) {
+        queryClient.setQueryData(queryKey, tasksSnapshot);
+      }
+
+      if (context?.previousEditingTask) {
+        setEditingTask(context.previousEditingTask);
+      }
+    },
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
@@ -83,7 +147,17 @@ export function App() {
             <TaskList
               error={tasksQuery.error ? formatApiError(tasksQuery.error) : null}
               isLoading={tasksQuery.isLoading}
+              onDelete={(task) => deleteMutation.mutate(task)}
               onEdit={setEditingTask}
+              onToggleComplete={(task, completed) =>
+                toggleCompleteMutation.mutate({ completed, task })
+              }
+              pendingTaskIds={getPendingTaskIds(
+                toggleCompleteMutation.isPending
+                  ? toggleCompleteMutation.variables?.task
+                  : undefined,
+                deleteMutation.isPending ? deleteMutation.variables : undefined
+              )}
               tasks={tasks}
             />
           </div>
@@ -145,4 +219,56 @@ function formatApiError(error: Error): string {
   }
 
   return error.message;
+}
+
+function applyTaskToCache(
+  tasks: Task[] | undefined,
+  task: Task,
+  status: TaskStatusFilter
+): Task[] | undefined {
+  if (!tasks) {
+    return tasks;
+  }
+
+  const tasksWithoutUpdated = tasks.filter((currentTask) => currentTask.id !== task.id);
+
+  if (!matchesStatus(task, status)) {
+    return tasksWithoutUpdated;
+  }
+
+  return [task, ...tasksWithoutUpdated].sort(compareTasks);
+}
+
+function compareTasks(first: Task, second: Task): number {
+  if (first.completed !== second.completed) {
+    return Number(first.completed) - Number(second.completed);
+  }
+
+  return second.createdAt.localeCompare(first.createdAt);
+}
+
+function getPendingTaskIds(...tasks: ReadonlyArray<Task | undefined>): ReadonlySet<string> {
+  return new Set(tasks.filter((task): task is Task => Boolean(task)).map((task) => task.id));
+}
+
+function getStatusFromQueryKey(queryKey: readonly unknown[]): TaskStatusFilter {
+  const status = queryKey[1];
+
+  if (status === "active" || status === "completed") {
+    return status;
+  }
+
+  return "all";
+}
+
+function matchesStatus(task: Task, status: TaskStatusFilter): boolean {
+  if (status === "active") {
+    return !task.completed;
+  }
+
+  if (status === "completed") {
+    return task.completed;
+  }
+
+  return true;
 }

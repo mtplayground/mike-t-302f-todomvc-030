@@ -21,6 +21,10 @@ export interface TaskFormInput {
   readonly title: string;
 }
 
+export interface TaskUpdateInput extends Partial<TaskFormInput> {
+  readonly completed?: boolean;
+}
+
 interface ListTasksResponse {
   readonly tasks: Task[];
 }
@@ -50,11 +54,17 @@ export async function getTasks(
   return response.tasks;
 }
 
-export async function updateTask(id: string, input: TaskFormInput): Promise<Task> {
+export async function updateTask(id: string, input: TaskUpdateInput): Promise<Task> {
   const response = await apiRequest<TaskResponse>(`/tasks/${id}`, {
     body: input,
     method: "PATCH",
   });
 
   return response.task;
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  await apiRequest<void>(`/tasks/${id}`, {
+    method: "DELETE",
+  });
 }
